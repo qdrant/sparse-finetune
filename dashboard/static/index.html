@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>qdrant-sparse-finetune</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="app">
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                </div>
+                <div class="logo-text">
+                    <h1>qdrant-sparse-finetune</h1>
+                    <div class="subtitle">Fine-tune SPLADE sparse embeddings with ANCE hard negative mining</div>
+                </div>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="status-badge" id="gpu-status">
+                <span class="status-dot gray" id="gpu-dot"></span>
+                <span id="gpu-label">GPU: checking...</span>
+            </div>
+            <div class="status-badge" id="qdrant-status">
+                <span class="status-dot gray" id="qdrant-dot"></span>
+                <span id="qdrant-label">Qdrant: checking...</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="main">
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="nav-section">
+                <div class="nav-section-title">Workflow</div>
+                <div class="nav-item active" data-tab="train" onclick="switchTab('train')">
+                    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8.5 1.5A.5.5 0 009 1h-.5a.5.5 0 000 1H9a.5.5 0 00-.5-.5zM3 13.5a.5.5 0 01.5-.5h9a.5.5 0 010 1h-9a.5.5 0 01-.5-.5zM5 3a2 2 0 00-2 2v5a2 2 0 002 2h6a2 2 0 002-2V5a2 2 0 00-2-2H5zm.5 2h5a.5.5 0 010 1h-5a.5.5 0 010-1zm0 2h5a.5.5 0 010 1h-5a.5.5 0 010-1zm0 2h3a.5.5 0 010 1h-3a.5.5 0 010-1z"/></svg>
+                    <span>Train</span>
+                </div>
+                <div class="nav-item" data-tab="evaluate" onclick="switchTab('evaluate')">
+                    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 2.5A1.5 1.5 0 012.5 1h3A1.5 1.5 0 017 2.5v3A1.5 1.5 0 015.5 7h-3A1.5 1.5 0 011 5.5v-3zm8 0A1.5 1.5 0 0110.5 1h3A1.5 1.5 0 0115 2.5v3A1.5 1.5 0 0113.5 7h-3A1.5 1.5 0 019 5.5v-3zm-8 8A1.5 1.5 0 012.5 9h3A1.5 1.5 0 017 10.5v3A1.5 1.5 0 015.5 15h-3A1.5 1.5 0 011 13.5v-3zm8 0A1.5 1.5 0 0110.5 9h3a1.5 1.5 0 011.5 1.5v3a1.5 1.5 0 01-1.5 1.5h-3A1.5 1.5 0 019 13.5v-3z"/></svg>
+                    <span>Evaluate</span>
+                </div>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">Data</div>
+                <div class="nav-item" data-tab="collections" onclick="switchTab('collections')">
+                    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2.5 0A1.5 1.5 0 001 1.5v13A1.5 1.5 0 002.5 16h11a1.5 1.5 0 001.5-1.5V5.621a1.5 1.5 0 00-.44-1.06l-4.12-4.122A1.5 1.5 0 009.378 0H2.5zM11 5a1 1 0 01-1-1V1l5 5h-4z"/></svg>
+                    <span>Collections</span>
+                </div>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">Deploy</div>
+                <div class="nav-item" data-tab="publish" onclick="switchTab('publish')">
+                    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8 8 0 110 16A8 8 0 018 0zm3.78 4.22a.75.75 0 00-1.06 0L7 7.94 5.28 6.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.06 0l4.25-4.25a.75.75 0 000-1.06z"/></svg>
+                    <span>Publish</span>
+                </div>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">Config</div>
+                <div class="nav-item" data-tab="settings" onclick="switchTab('settings')">
+                    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 4.754a3.246 3.246 0 100 6.492 3.246 3.246 0 000-6.492zM5.754 8a2.246 2.246 0 114.492 0 2.246 2.246 0 01-4.492 0z"/><path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 01-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 01-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 01.52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 011.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 011.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 01.52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 01-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 01-1.255-.52l-.094-.319z"/></svg>
+                    <span>Settings</span>
+                </div>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">History</div>
+                <div class="nav-item" data-tab="jobs" onclick="switchTab('jobs')">
+                    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1.5 8a6.5 6.5 0 1113 0 6.5 6.5 0 01-13 0zM8 0a8 8 0 100 16A8 8 0 008 0zm.5 4.75a.75.75 0 00-1.5 0v3.5a.75.75 0 00.37.65l2.5 1.5a.75.75 0 10.76-1.3L8.5 7.94V4.75z"/></svg>
+                    <span>Jobs</span>
+                </div>
+            </div>
+            <div class="sidebar-footer">
+                <div class="version-tag" id="version-tag">v--</div>
+            </div>
+        </nav>
+
+        <!-- Content -->
+        <main class="content">
+
+            <!-- Train Tab -->
+            <div class="tab-content active" id="tab-train">
+                <div class="page-header">
+                    <h2>Train Model</h2>
+                    <p>Configure and launch a SPLADE fine-tuning job with ANCE hard negative mining</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Training Configuration</span>
+                    </div>
+                    <div class="form-grid">
+                        <div class="form-group full-width">
+                            <label class="form-label">Data File Path</label>
+                            <input class="form-input" type="text" id="train-data" placeholder="/path/to/products.csv">
+                        </div>
+                        <div class="form-group full-width">
+                            <label class="form-label">Queries File Path (optional)</label>
+                            <input class="form-input" type="text" id="train-queries" placeholder="/path/to/queries.jsonl (leave empty for synthetic generation)">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">GPU Backend</label>
+                            <select class="form-select" id="train-gpu">
+                                <option value="modal">Modal</option>
+                                <option value="vultr">Vultr</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Base Model</label>
+                            <input class="form-input" type="text" id="train-model" value="distilbert/distilbert-base-uncased">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">ANCE Iterations</label>
+                            <div class="slider-container">
+                                <input class="form-slider" type="range" id="train-ance" min="1" max="10" value="3" oninput="document.getElementById('ance-val').textContent=this.value">
+                                <span class="slider-value" id="ance-val">3</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Batch Size</label>
+                            <input class="form-input" type="number" id="train-batch" value="32">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Learning Rate</label>
+                            <input class="form-input" type="text" id="train-lr" value="2e-5">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Epochs</label>
+                            <input class="form-input" type="number" id="train-epochs" value="3">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Run Name</label>
+                            <input class="form-input" type="text" id="train-runname" value="finetune">
+                        </div>
+                    </div>
+                    <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+                        <button class="btn btn-primary btn-lg" id="btn-train" onclick="startTraining()">Start Training</button>
+                    </div>
+                </div>
+
+                <!-- Active job card (hidden by default) -->
+                <div class="job-card" id="active-job" style="display: none;">
+                    <div class="job-header">
+                        <div>
+                            <span class="card-title">Active Training Job</span>
+                            <span class="job-id" id="active-job-id"></span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span class="elapsed-time" id="active-elapsed"></span>
+                            <span class="job-status running" id="active-status">RUNNING</span>
+                        </div>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill indeterminate" id="active-progress"></div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="loss-chart"></canvas>
+                    </div>
+                    <div class="log-output" id="active-logs">
+                        <div class="log-line">Waiting for logs...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Evaluate Tab -->
+            <div class="tab-content" id="tab-evaluate">
+                <div class="page-header">
+                    <h2>Evaluate Model</h2>
+                    <p>Run retrieval evaluation against a Qdrant collection and view metrics</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Evaluation Configuration</span>
+                    </div>
+                    <div class="form-grid">
+                        <div class="form-group full-width">
+                            <label class="form-label">Model Path</label>
+                            <input class="form-input" type="text" id="eval-model" placeholder="/path/to/trained/model">
+                        </div>
+                        <div class="form-group full-width">
+                            <label class="form-label">Test Queries Path</label>
+                            <input class="form-input" type="text" id="eval-queries" placeholder="/path/to/test_queries.jsonl">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Collection Name (optional)</label>
+                            <input class="form-input" type="text" id="eval-collection" placeholder="sparse_finetune">
+                        </div>
+                    </div>
+                    <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+                        <button class="btn btn-primary btn-lg" id="btn-eval" onclick="startEvaluation()">Run Evaluation</button>
+                    </div>
+                </div>
+
+                <div id="eval-results" style="display: none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Evaluation Results</span>
+                            <span class="job-status completed" id="eval-status">COMPLETED</span>
+                        </div>
+                        <div class="metrics-grid" id="metrics-grid"></div>
+                    </div>
+                </div>
+
+                <div id="eval-feedback" class="feedback"></div>
+            </div>
+
+            <!-- Collections Tab -->
+            <div class="tab-content" id="tab-collections">
+                <div class="page-header">
+                    <h2>Qdrant Collections</h2>
+                    <p>Browse collections and test search queries</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Collections</span>
+                        <button class="btn btn-secondary" onclick="loadCollections()">Refresh</button>
+                    </div>
+                    <table class="data-table" id="collections-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Points</th>
+                                <th>Vectors</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="collections-body">
+                            <tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 24px;">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Search Test</span>
+                    </div>
+                    <div class="search-row">
+                        <div class="form-group">
+                            <label class="form-label">Collection</label>
+                            <select class="form-select" id="search-collection"></select>
+                        </div>
+                        <div class="form-group" style="flex: 2;">
+                            <label class="form-label">Query</label>
+                            <input class="form-input" type="text" id="search-query" placeholder="Type a search query...">
+                        </div>
+                        <div class="form-group" style="flex: 0;">
+                            <label class="form-label">Top-K</label>
+                            <input class="form-input" type="number" id="search-topk" value="10" style="width: 70px;">
+                        </div>
+                        <button class="btn btn-primary" onclick="runSearch()" style="margin-bottom: 0;">Search</button>
+                    </div>
+                    <div class="search-results" id="search-results"></div>
+                </div>
+            </div>
+
+            <!-- Publish Tab -->
+            <div class="tab-content" id="tab-publish">
+                <div class="page-header">
+                    <h2>Publish to HuggingFace</h2>
+                    <p>Push your trained sparse encoder model to HuggingFace Hub</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Publish Configuration</span>
+                    </div>
+                    <div class="form-grid">
+                        <div class="form-group full-width">
+                            <label class="form-label">Model Path</label>
+                            <input class="form-input" type="text" id="pub-model" placeholder="/path/to/trained/model">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">HuggingFace Repo Name</label>
+                            <input class="form-input" type="text" id="pub-repo" placeholder="my-org/my-splade-model">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">HuggingFace Token</label>
+                            <input class="form-input" type="password" id="pub-token" placeholder="hf_...">
+                        </div>
+                        <div class="form-group">
+                            <div class="checkbox-group" style="margin-top: 20px;">
+                                <input type="checkbox" id="pub-private">
+                                <label for="pub-private">Private repository</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+                        <button class="btn btn-primary btn-lg" id="btn-publish" onclick="publishModel()">Publish</button>
+                    </div>
+                </div>
+
+                <div id="pub-feedback" class="feedback"></div>
+            </div>
+
+            <!-- Jobs Tab -->
+            <div class="tab-content" id="tab-jobs">
+                <div class="page-header">
+                    <h2>Job History</h2>
+                    <p>View all training, evaluation, and publishing jobs</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">All Jobs</span>
+                        <button class="btn btn-secondary" onclick="loadJobs()">Refresh</button>
+                    </div>
+                    <div id="jobs-list" class="jobs-list">
+                        <div class="empty-state">
+                            <h3>No jobs yet</h3>
+                            <p>Start a training job to see it here</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Job detail (shown when clicking a job) -->
+                <div class="card" id="job-detail" style="display: none;">
+                    <div class="card-header">
+                        <span class="card-title">Job Details</span>
+                        <span class="job-status" id="detail-status"></span>
+                    </div>
+                    <div id="detail-header-info" style="margin-bottom: 12px;"></div>
+                    <div id="detail-config" style="font-size: 13px; color: var(--text-secondary);"></div>
+                    <div id="detail-results" style="margin-top: 16px; display: none;"></div>
+                    <div class="log-output" id="detail-logs" style="margin-top: 12px;"></div>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div class="tab-content" id="tab-settings">
+                <div class="page-header">
+                    <h2>Settings</h2>
+                    <p>Manage API keys and service credentials (stored in .env)</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">API Keys</span>
+                    </div>
+                    <div class="form-grid" id="settings-form">
+                        <div class="form-group full-width" data-key="QDRANT_URL">
+                            <label class="form-label">QDRANT_URL</label>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <input class="form-input settings-input" type="password" id="setting-QDRANT_URL" placeholder="https://...">
+                                <button class="btn btn-secondary" type="button" onclick="toggleReveal(this)" style="white-space:nowrap;">Show</button>
+                            </div>
+                        </div>
+                        <div class="form-group full-width" data-key="QDRANT_API_KEY">
+                            <label class="form-label">QDRANT_API_KEY</label>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <input class="form-input settings-input" type="password" id="setting-QDRANT_API_KEY" placeholder="Key...">
+                                <button class="btn btn-secondary" type="button" onclick="toggleReveal(this)" style="white-space:nowrap;">Show</button>
+                            </div>
+                        </div>
+                        <div class="form-group full-width" data-key="OPENAI_API_KEY">
+                            <label class="form-label">OPENAI_API_KEY</label>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <input class="form-input settings-input" type="password" id="setting-OPENAI_API_KEY" placeholder="sk-...">
+                                <button class="btn btn-secondary" type="button" onclick="toggleReveal(this)" style="white-space:nowrap;">Show</button>
+                            </div>
+                        </div>
+                        <div class="form-group full-width" data-key="ANTHROPIC_API_KEY">
+                            <label class="form-label">ANTHROPIC_API_KEY</label>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <input class="form-input settings-input" type="password" id="setting-ANTHROPIC_API_KEY" placeholder="sk-ant-...">
+                                <button class="btn btn-secondary" type="button" onclick="toggleReveal(this)" style="white-space:nowrap;">Show</button>
+                            </div>
+                        </div>
+                        <div class="form-group full-width" data-key="OPENROUTER_API_KEY">
+                            <label class="form-label">OPENROUTER_API_KEY</label>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <input class="form-input settings-input" type="password" id="setting-OPENROUTER_API_KEY" placeholder="sk-or-...">
+                                <button class="btn btn-secondary" type="button" onclick="toggleReveal(this)" style="white-space:nowrap;">Show</button>
+                            </div>
+                        </div>
+                        <div class="form-group full-width" data-key="VULTR_API_KEY">
+                            <label class="form-label">VULTR_API_KEY</label>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <input class="form-input settings-input" type="password" id="setting-VULTR_API_KEY" placeholder="Key...">
+                                <button class="btn btn-secondary" type="button" onclick="toggleReveal(this)" style="white-space:nowrap;">Show</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 12px;">
+                        <div id="settings-feedback" class="feedback" style="display:none;flex:1;margin:0;"></div>
+                        <button class="btn btn-primary btn-lg" onclick="saveSettings()">Save Settings</button>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
