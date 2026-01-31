@@ -407,6 +407,32 @@ def publish(model, repo, hf_token, private):
 
 
 # ---------------------------------------------------------------------------
+# studio (dashboard)
+# ---------------------------------------------------------------------------
+
+@cli.command()
+@click.option("--port", default=7777, type=int, help="Port to run the dashboard on")
+@click.option("--host", default="127.0.0.1", help="Host to bind to")
+def studio(port, host):
+    """Launch the web dashboard for training, evaluation, and publishing."""
+    import subprocess
+    import sys
+
+    dashboard_path = Path(__file__).parent.parent.parent / "dashboard" / "server.py"
+    if not dashboard_path.exists():
+        # Try installed package location
+        dashboard_path = Path(__file__).parent / ".." / ".." / "dashboard" / "server.py"
+        dashboard_path = dashboard_path.resolve()
+
+    if not dashboard_path.exists():
+        console.print("[red]Dashboard not found. Ensure the dashboard/ directory is present.[/red]")
+        raise SystemExit(1)
+
+    console.print(f"[bold cyan]Launching studio at http://{host}:{port}[/bold cyan]")
+    subprocess.run([sys.executable, str(dashboard_path), "--port", str(port), "--host", host])
+
+
+# ---------------------------------------------------------------------------
 # pipeline (end-to-end)
 # ---------------------------------------------------------------------------
 

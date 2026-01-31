@@ -405,9 +405,16 @@ def serve_index():
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--port", type=int, default=7777)
+    parser.add_argument("--host", type=str, default="127.0.0.1")
+    args = parser.parse_args()
+
     def _open_browser():
         time.sleep(1.5)
-        webbrowser.open("http://localhost:7777")
+        webbrowser.open(f"http://localhost:{args.port}")
 
     threading.Thread(target=_open_browser, daemon=True).start()
-    uvicorn.run(app, host="0.0.0.0", port=7777)
+    uvicorn.run(app, host=args.host, port=args.port)
