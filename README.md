@@ -15,7 +15,7 @@ That's it. Loads your data, generates synthetic queries via LLM, trains a SPLADE
 ## Setup
 
 ```bash
-pip install qdrant-sparse-finetune
+pip install git+https://github.com/qdrant/sparse-finetune.git
 qdrant-finetune setup
 ```
 
