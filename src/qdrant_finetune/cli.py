@@ -579,5 +579,269 @@ def pipeline(data, queries, gpu, repo, hf_token, private, synth_model,
         raise
 
 
+# ---------------------------------------------------------------------------
+# relevance-feedback (train params)
+# ---------------------------------------------------------------------------
+
+@cli.command("train-rf")
+@click.option("--model", required=True, help="Path to trained SPLADE model")
+@click.option("--queries", required=True, help="Path to query data (one query per line, or JSONL with 'query' field)")
+@click.option("--collection", default=None, help="Qdrant collection name")
+@click.option("--feedback-model", default="mixedbread-ai/mxbai-embed-large-v1", help="Feedback embedding model")
+@click.option("--context-limit", default=10, type=int, help="Number of initial results for feedback")
+@click.option("--qdrant-url", default=None, help="Qdrant URL")
+@click.option("--qdrant-api-key", default=None, help="Qdrant API key")
+@click.option("--output", default="rf_params.json", help="Output file for learned parameters")
+def train_rf(model, queries, collection, feedback_model, context_limit, output, **kwargs):
+    """Train relevance feedback parameters (a, b, c) for your SPLADE model and collection.
+
+    Requires: pip install qdrant-sparse-finetune[rf]
+    """
+    import json
+    from datetime import datetime
+
+    from qdrant_finetune.config import FinetuneConfig
+    from qdrant_finetune.job_store import JobStore
+    from qdrant_finetune.relevance_feedback import RFConfig, RFParams, train_rf_params
+
+    store = JobStore()
+    job = store.create_job("train-rf", config={
+        "model": model, "queries": queries, "feedback_model": feedback_model,
+    }, source="cli")
+    job_id = job["id"]
+    store.update_job(job_id, status="running", started_at=datetime.utcnow().isoformat())
+
+    try:
+        # load SPLADE model
+        from qdrant_finetune.model.sparse_model import load_sparse_encoder
+        splade = load_sparse_encoder(model)
+
+        # load queries
+        query_texts = _load_query_texts(queries)
+        console.print(f"Loaded {len(query_texts)} queries for RF training")
+
+        # qdrant client
+        overrides = {k.replace("-", "_"): v for k, v in kwargs.items() if v is not None}
+        config = FinetuneConfig(**overrides)
+        from qdrant_finetune.qdrant.client import get_qdrant_client
+        client = get_qdrant_client(url=config.qdrant_url, api_key=config.qdrant_api_key or None)
+
+        coll = collection or config.collection_name
+
+        rf_config = RFConfig(
+            feedback_model=feedback_model,
+            context_limit=context_limit,
+        )
+
+        console.print(f"Training RF params with feedback model: [cyan]{feedback_model}[/cyan]")
+        params = train_rf_params(
+            client=client,
+            splade_model=splade,
+            collection_name=coll,
+            queries=query_texts,
+            config=rf_config,
+        )
+
+        # save params
+        out_path = Path(output)
+        out_path.write_text(json.dumps(params.to_dict(), indent=2) + "\n")
+        console.print(f"\n[green]Learned RF params:[/green] a={params.a:.4f}, b={params.b:.4f}, c={params.c:.4f}")
+        console.print(f"[green]Saved to {out_path}[/green]")
+
+        store.update_job(job_id, status="completed", results=params.to_dict(), completed_at=datetime.utcnow().isoformat())
+    except Exception as e:
+        store.update_job(job_id, status="failed", error=str(e), completed_at=datetime.utcnow().isoformat())
+        store.append_log(job_id, f"ERROR: {e}")
+        raise
+
+
+# ---------------------------------------------------------------------------
+# relevance-feedback (evaluate)
+# ---------------------------------------------------------------------------
+
+@cli.command("eval-rf")
+@click.option("--model", required=True, help="Path to trained SPLADE model")
+@click.option("--queries", required=True, help="Path to query data with relevance labels")
+@click.option("--collection", default=None, help="Qdrant collection name")
+@click.option("--feedback-model", default="mixedbread-ai/mxbai-embed-large-v1", help="Feedback embedding model")
+@click.option("--context-limit", default=10, type=int, help="Number of initial results for feedback")
+@click.option("--params", "params_file", default=None, help="Path to RF params JSON (from train-rf)")
+@click.option("--qdrant-url", default=None, help="Qdrant URL")
+@click.option("--qdrant-api-key", default=None, help="Qdrant API key")
+def eval_rf(model, queries, collection, feedback_model, context_limit, params_file, **kwargs):
+    """Evaluate relevance feedback vs vanilla SPLADE retrieval side-by-side."""
+    import json
+    from datetime import datetime
+
+    from qdrant_finetune.config import FinetuneConfig
+    from qdrant_finetune.data.loader import load_queries as load_query_data
+    from qdrant_finetune.eval.metrics import print_metrics
+    from qdrant_finetune.job_store import JobStore
+    from qdrant_finetune.relevance_feedback import RFConfig, RFParams, evaluate_rf
+
+    store = JobStore()
+    job = store.create_job("eval-rf", config={
+        "model": model, "queries": queries, "feedback_model": feedback_model,
+    }, source="cli")
+    job_id = job["id"]
+    store.update_job(job_id, status="running", started_at=datetime.utcnow().isoformat())
+
+    try:
+        from qdrant_finetune.model.sparse_model import load_sparse_encoder
+        splade = load_sparse_encoder(model)
+
+        query_list = load_query_data(queries)
+        console.print(f"Loaded {len(query_list)} queries for evaluation")
+
+        overrides = {k.replace("-", "_"): v for k, v in kwargs.items() if v is not None}
+        config = FinetuneConfig(**overrides)
+        from qdrant_finetune.qdrant.client import get_qdrant_client
+        client = get_qdrant_client(url=config.qdrant_url, api_key=config.qdrant_api_key or None)
+
+        coll = collection or config.collection_name
+
+        params = RFParams()
+        if params_file:
+            with open(params_file) as f:
+                params = RFParams.from_dict(json.load(f))
+            console.print(f"Using RF params from {params_file}: a={params.a:.4f}, b={params.b:.4f}, c={params.c:.4f}")
+
+        rf_config = RFConfig(
+            feedback_model=feedback_model,
+            context_limit=context_limit,
+            params=params,
+        )
+
+        results = evaluate_rf(
+            client=client,
+            splade_model=splade,
+            collection_name=coll,
+            queries=query_list,
+            config=rf_config,
+        )
+
+        console.print()
+        print_metrics(results["vanilla"], title="Vanilla SPLADE")
+        print_metrics(results["relevance_feedback"], title="SPLADE + Relevance Feedback")
+        print_metrics(results["delta"], title="Delta (RF - Vanilla)")
+
+        store.update_job(job_id, status="completed", results=results, completed_at=datetime.utcnow().isoformat())
+    except Exception as e:
+        store.update_job(job_id, status="failed", error=str(e), completed_at=datetime.utcnow().isoformat())
+        store.append_log(job_id, f"ERROR: {e}")
+        raise
+
+
+# ---------------------------------------------------------------------------
+# relevance-feedback (interactive query)
+# ---------------------------------------------------------------------------
+
+@cli.command("query-rf")
+@click.option("--model", required=True, help="Path to trained SPLADE model")
+@click.option("--collection", default=None, help="Qdrant collection name")
+@click.option("--feedback-model", default="mixedbread-ai/mxbai-embed-large-v1", help="Feedback embedding model")
+@click.option("--context-limit", default=10, type=int, help="Number of initial results for feedback")
+@click.option("--limit", default=10, type=int, help="Number of final results")
+@click.option("--params", "params_file", default=None, help="Path to RF params JSON")
+@click.option("--qdrant-url", default=None, help="Qdrant URL")
+@click.option("--qdrant-api-key", default=None, help="Qdrant API key")
+@click.argument("query")
+def query_rf(model, collection, feedback_model, context_limit, limit, params_file, query, **kwargs):
+    """Run a single query with relevance feedback and compare to vanilla results."""
+    import json
+
+    from rich.table import Table
+
+    from qdrant_finetune.config import FinetuneConfig
+    from qdrant_finetune.model.sparse_model import load_sparse_encoder
+    from qdrant_finetune.qdrant.client import get_qdrant_client
+    from qdrant_finetune.relevance_feedback import RFConfig, RFParams, RelevanceFeedbackSearch
+
+    splade = load_sparse_encoder(model)
+
+    overrides = {k.replace("-", "_"): v for k, v in kwargs.items() if v is not None}
+    config = FinetuneConfig(**overrides)
+    client = get_qdrant_client(url=config.qdrant_url, api_key=config.qdrant_api_key or None)
+
+    coll = collection or config.collection_name
+
+    params = RFParams()
+    if params_file:
+        with open(params_file) as f:
+            params = RFParams.from_dict(json.load(f))
+
+    rf_config = RFConfig(
+        feedback_model=feedback_model,
+        context_limit=context_limit,
+        rf_limit=limit,
+        params=params,
+    )
+
+    rf_search = RelevanceFeedbackSearch(
+        client=client,
+        splade_model=splade,
+        collection_name=coll,
+        config=rf_config,
+    )
+
+    console.print(f"\n[bold]Query:[/bold] {query}")
+    console.print(f"[dim]Feedback model: {feedback_model} | context_limit: {context_limit}[/dim]\n")
+
+    comparison = rf_search.search_compare(query, limit=limit, context_limit=context_limit)
+
+    # vanilla results
+    table = Table(title="Vanilla SPLADE")
+    table.add_column("#", style="dim")
+    table.add_column("Score", style="cyan")
+    table.add_column("Product", style="white")
+    for i, r in enumerate(comparison["vanilla"][:limit], 1):
+        text = r["payload"].get("text", "")[:100]
+        table.add_row(str(i), f"{r['score']:.4f}", text)
+    console.print(table)
+
+    console.print()
+
+    # RF results
+    table = Table(title="SPLADE + Relevance Feedback")
+    table.add_column("#", style="dim")
+    table.add_column("Score", style="green")
+    table.add_column("Product", style="white")
+    for i, r in enumerate(comparison["relevance_feedback"][:limit], 1):
+        text = r["payload"].get("text", "")[:100]
+        table.add_row(str(i), f"{r['score']:.4f}", text)
+    console.print(table)
+
+    # show new results surfaced
+    vanilla_ids = {r["id"] for r in comparison["vanilla"][:limit]}
+    rf_ids = {r["id"] for r in comparison["relevance_feedback"][:limit]}
+    new_ids = rf_ids - vanilla_ids
+    if new_ids:
+        console.print(f"\n[green]{len(new_ids)} new results surfaced by relevance feedback[/green]")
+    else:
+        console.print(f"\n[dim]Same result set (ordering may differ)[/dim]")
+
+
+# ---------------------------------------------------------------------------
+# helpers
+# ---------------------------------------------------------------------------
+
+def _load_query_texts(path: str) -> list[str]:
+    """Load query texts from a file (plain text, one per line, or JSONL with 'query' field)."""
+    import json
+
+    queries = []
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+                queries.append(obj.get("query", line))
+            except json.JSONDecodeError:
+                queries.append(line)
+    return queries
+
+
 if __name__ == "__main__":
     cli()

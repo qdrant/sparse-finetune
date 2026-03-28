@@ -160,6 +160,101 @@ class Trainer:
         self.model = load_sparse_encoder(path, device=device)
         return self
 
+    def rf_search(
+        self,
+        query: str,
+        collection_name: Optional[str] = None,
+        feedback_model: str = "mixedbread-ai/mxbai-embed-large-v1",
+        context_limit: int = 10,
+        limit: int = 10,
+        params: Optional[dict] = None,
+    ) -> list:
+        """Run a relevance feedback search query.
+
+        Args:
+            query: Search query text.
+            collection_name: Qdrant collection to search.
+            feedback_model: Dense embedding model for feedback scoring.
+            context_limit: Number of initial results to get feedback on.
+            limit: Number of final results to return.
+            params: Dict with a, b, c formula parameters. Uses defaults if None.
+        """
+        if self.model is None:
+            raise ValueError("No model loaded. Call fit() or load() first.")
+
+        from qdrant_finetune.relevance_feedback import (
+            RFConfig,
+            RFParams,
+            RelevanceFeedbackSearch,
+        )
+
+        rf_params = RFParams(**params) if params else RFParams()
+        config = RFConfig(
+            feedback_model=feedback_model,
+            context_limit=context_limit,
+            rf_limit=limit,
+            params=rf_params,
+        )
+
+        rf = RelevanceFeedbackSearch(
+            client=self.client,
+            splade_model=self.model,
+            collection_name=collection_name or self.config.collection_name,
+            config=config,
+        )
+        return rf.search(query, limit=limit, context_limit=context_limit)
+
+    def evaluate_rf(
+        self,
+        queries: Union[str, list[dict]],
+        collection_name: Optional[str] = None,
+        feedback_model: str = "mixedbread-ai/mxbai-embed-large-v1",
+        context_limit: int = 10,
+        params: Optional[dict] = None,
+        k_values: list[int] = [10, 50, 100],
+    ) -> dict:
+        """Evaluate relevance feedback vs vanilla retrieval.
+
+        Returns metrics for both methods plus the delta.
+        """
+        if self.model is None:
+            raise ValueError("No model loaded. Call fit() or load() first.")
+
+        from qdrant_finetune.data.loader import load_queries
+        from qdrant_finetune.relevance_feedback import (
+            RFConfig,
+            RFParams,
+            evaluate_rf,
+        )
+
+        if isinstance(queries, str):
+            query_list = load_queries(queries)
+        else:
+            query_list = queries
+
+        rf_params = RFParams(**params) if params else RFParams()
+        config = RFConfig(
+            feedback_model=feedback_model,
+            context_limit=context_limit,
+            params=rf_params,
+        )
+
+        results = evaluate_rf(
+            client=self.client,
+            splade_model=self.model,
+            collection_name=collection_name or self.config.collection_name,
+            queries=query_list,
+            config=config,
+            k_values=k_values,
+        )
+
+        from qdrant_finetune.eval.metrics import print_metrics
+        print_metrics(results["vanilla"], title="Vanilla SPLADE")
+        print_metrics(results["relevance_feedback"], title="SPLADE + Relevance Feedback")
+        print_metrics(results["delta"], title="Delta")
+
+        return results
+
     def _queries_to_pairs(self, query_list: list[dict], products: list[dict]) -> list[dict]:
         """Convert query relevance judgments to anchor-positive training pairs."""
         product_lookup = {p["product_id"]: p["text"] for p in products}

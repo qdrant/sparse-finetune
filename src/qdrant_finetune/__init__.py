@@ -13,9 +13,21 @@ if not os.environ.get("QDRANT_FINETUNE_ALLOW_MPS"):
         pass
 
 from qdrant_finetune.config import FinetuneConfig
+from qdrant_finetune.relevance_feedback import (
+    RelevanceFeedbackSearch,
+    RFConfig,
+    RFParams,
+)
 from qdrant_finetune.trainer import Trainer
 
-__all__ = ["Trainer", "FinetuneConfig", "finetune"]
+__all__ = [
+    "Trainer",
+    "FinetuneConfig",
+    "finetune",
+    "RelevanceFeedbackSearch",
+    "RFConfig",
+    "RFParams",
+]
 
 
 def finetune(
