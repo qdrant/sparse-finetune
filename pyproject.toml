@@ -18,7 +18,7 @@ dependencies = [
     "pandas>=2.0",
     "tqdm",
     "numpy",
-    "torch>=2.0,<2.7",
+    "torch>=2.0,<2.15",
     "transformers>=4.40,<5.0",
     "pyyaml",
     "litellm>=1.0",
