@@ -128,7 +128,7 @@ def load_queries(
     if "positive_text" in df.columns and "positive_ids" in df.columns:
         logger.info("Detected synthetic query format with positive_text/positive_ids")
         results = []
-        for _, row in df.iterrows():
+        for i, row in df.iterrows():
             pids = row["positive_ids"]
             if isinstance(pids, str):
                 import json as _json
@@ -137,9 +137,12 @@ def load_queries(
                 except Exception:
                     pids = [pids]
             results.append({
+                "query_id": str(i),
                 "query": str(row[query_col]),
                 "positive_text": str(row["positive_text"]),
                 "positive_ids": [str(p) for p in pids],
+                # Synthetic files have only positives: "E" is the evaluator's fully relevant label
+                "relevance": {str(p): "E" for p in pids},
             })
         return results
 
