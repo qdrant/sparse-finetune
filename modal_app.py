@@ -113,9 +113,6 @@ def evaluate(
     image=image,
     timeout=1800,
     volumes={"/data": data_volume},
-    secrets=[
-        modal.Secret.from_name("openai"),
-    ],
 )
 def generate_queries(
     data_path: str = "/data/products.csv",

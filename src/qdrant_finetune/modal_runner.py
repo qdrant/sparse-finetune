@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -156,7 +157,9 @@ def run_on_modal(
 
     if result.returncode == 0:
         console.print("\n[bold green]Training complete![/bold green]")
-        console.print("Download model: modal volume get finetune-output /modal_run/final ./output")
+        # Download into output/<run_name>/final, where evaluate and publish look for the model
+        dest = shlex.quote(f"output/{(config_override or {}).get('run_name', 'finetune')}")
+        console.print(f"Download model: mkdir -p {dest} && modal volume get finetune-output /modal_run/final {dest}")
     else:
         console.print("\n[bold red]Training failed. Check Modal logs.[/bold red]")
         sys.exit(1)
