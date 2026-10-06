@@ -113,7 +113,6 @@ def evaluate(
     image=image,
     timeout=1800,
     volumes={"/data": data_volume},
-    secrets=[],  # not called by the CLI: pipeline generates queries locally
 )
 def generate_queries(
     data_path: str = "/data/products.csv",
