@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Literal, Optional
 
 import yaml
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,8 +19,17 @@ class FinetuneConfig(BaseSettings):
     )
 
     # Qdrant
-    qdrant_url: str = Field(default="http://localhost:6333", description="Qdrant URL")
-    qdrant_api_key: str = Field(default="", description="Qdrant API key")
+    # Also accept QDRANT_URL / QDRANT_API_KEY, the names `qdrant-finetune setup` writes to .env
+    qdrant_url: str = Field(
+        default="http://localhost:6333",
+        validation_alias=AliasChoices("QDRANT_FINETUNE_QDRANT_URL", "qdrant_url"),
+        description="Qdrant URL",
+    )
+    qdrant_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("QDRANT_FINETUNE_QDRANT_API_KEY", "qdrant_api_key"),
+        description="Qdrant API key",
+    )
 
     # Model
     base_model: str = Field(

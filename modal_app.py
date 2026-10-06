@@ -113,9 +113,9 @@ def evaluate(
     image=image,
     timeout=1800,
     volumes={"/data": data_volume},
-    secrets=[
-        modal.Secret.from_name("openai"),
-    ],
+    # No secrets: the CLI never calls this function (pipeline generates queries locally), and a
+    # required "openai" secret, which setup does not create, made every `modal run` fail
+    secrets=[],
 )
 def generate_queries(
     data_path: str = "/data/products.csv",

@@ -19,7 +19,7 @@ dependencies = [
     "tqdm",
     "numpy",
     "torch>=2.0,<2.7",
-    "transformers>=4.40,<5.0",
+    "transformers>=4.40",
     "pyyaml",
     "litellm>=1.0",
     "rich>=13.0",
