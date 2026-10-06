@@ -141,6 +141,7 @@ def load_queries(
                 "query": str(row[query_col]),
                 "positive_text": str(row["positive_text"]),
                 "positive_ids": [str(p) for p in pids],
+                # Synthetic files have only positives: "E" is the evaluator's fully relevant label
                 "relevance": {str(p): "E" for p in pids},
             })
         return results
