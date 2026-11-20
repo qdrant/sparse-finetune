@@ -98,7 +98,7 @@ def setup():
         if key:
             env_lines.append(f"ANTHROPIC_API_KEY={key}")
             llm_env["ANTHROPIC_API_KEY"] = key
-        synth_model = Prompt.ask("  Model", default="anthropic/claude-sonnet-4-20250514")
+        synth_model = Prompt.ask("  Model", default="anthropic/claude-sonnet-4-6")
     elif provider == "openrouter":
         key = Prompt.ask("  OpenRouter API key", default=os.environ.get("OPENROUTER_API_KEY", ""))
         if key:

@@ -101,7 +101,7 @@ Synthetic query generation uses [litellm](https://docs.litellm.ai/docs/providers
 | Provider | Env Var | Example |
 |----------|---------|---------|
 | OpenAI | `OPENAI_API_KEY` | `--synth-model gpt-4o-mini` |
-| Anthropic | `ANTHROPIC_API_KEY` | `--synth-model anthropic/claude-sonnet-4-20250514` |
+| Anthropic | `ANTHROPIC_API_KEY` | `--synth-model anthropic/claude-sonnet-4-6` |
 | OpenRouter | `OPENROUTER_API_KEY` | `--synth-model openrouter/google/gemma-2-9b-it` |
 | Ollama (local) | — | `--synth-model ollama/llama3` |
 
