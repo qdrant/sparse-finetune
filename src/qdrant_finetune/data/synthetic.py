@@ -2,7 +2,7 @@
 
 Supported providers (set the corresponding env var):
   - OpenAI:      OPENAI_API_KEY        model="gpt-4o-mini"
-  - Anthropic:   ANTHROPIC_API_KEY     model="anthropic/claude-sonnet-4-20250514"
+  - Anthropic:   ANTHROPIC_API_KEY     model="anthropic/claude-sonnet-4-6"
   - OpenRouter:  OPENROUTER_API_KEY    model="openrouter/google/gemma-2-9b-it"
   - Ollama:      (local, no key)       model="ollama/llama3"
 
